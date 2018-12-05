@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "avltree.h"
 
 /* Returns the maximum between two values */
 #define MAX(a, b) a > b ? a : b
-
+/* Number of threads used in testing */
+#define NUM_THREADS 4
 /* Helper function, performs a left-left rotation */
 Node *right_rotate(Node *y);
 /* Helper function, performs a right-right test */
@@ -30,6 +32,13 @@ struct node {
 struct avltree {
     Node *root; // pointer to root node
     int size; // size counter
+    pthread_mutex_t mutex; // mutex used to ensure thread safety
+};
+
+/* Arguments used in parallel insert */
+struct func_args {
+    AVL *tree; // pointer to an avl tree object
+    int data; // data being inserted into avl tree
 };
 
 /* Creates an empty AVL tree. Returns a pointer to the tree if successfull, NULL otherwise */
@@ -45,6 +54,12 @@ AVL *avl_init() {
     }
     tree -> root = NULL;
     tree -> size = 0;
+    /* Print error message and return NULL if the mutex failed to create */
+    if (pthread_mutex_init(&(tree -> mutex), NULL)) {
+        fprintf(stderr, "Error: failed to create mutex\n");
+        free((void *) tree);
+        tree = NULL;
+    }
 
     return tree;
 }
@@ -68,9 +83,16 @@ int avl_insert(AVL *tree, int data) {
     
     int temp;
 
+    /* Critical region */
     temp = tree -> size;
+    pthread_mutex_lock(&(tree -> mutex));
     tree -> root = avl_insert_node(tree, tree -> root, data);
-    if (temp == tree -> size - 1) return 1;
+    if (temp == tree -> size - 1) {
+        pthread_mutex_unlock(&(tree -> mutex));
+        return 1;
+    } 
+    pthread_mutex_unlock(&(tree -> mutex));
+
     return 0;
 }
 
@@ -192,27 +214,49 @@ static void delete_nodes(Node *node) {
 
 }
 
+/* Thread safe function which is used in inserting a node into the tree */
+void *parell_insert(void *arg) {
+
+    struct func_args *args;
+    int i, data;
+    AVL *tree;
+
+    args = (struct func_args *) arg;
+    tree = args -> tree;
+    data = args -> data;
+    avl_insert(tree, data);
+
+    pthread_exit(NULL);
+}
+
 int main(int argc, char **argv) {
 
     AVL *tree;
+    int i, nums[NUM_THREADS];
+    pthread_t threads[NUM_THREADS];
+    struct func_args args[NUM_THREADS];
 
+    for (i = 0; i < NUM_THREADS; i++) 
+        nums[i] = rand() % 50;
+    
     tree = avl_init();
-    avl_insert(tree, 10);
-    avl_display(tree, tree -> root);
-    printf("\n");
-    avl_insert(tree, 20);
-    avl_display(tree, tree -> root);
-    printf("\n");
-    avl_insert(tree, 30);
-    avl_display(tree, tree -> root);
-    printf("\n");   
-    avl_insert(tree, 40);
-    avl_display(tree, tree -> root);
-    printf("\n");
-    avl_insert(tree, 50);
-    avl_display(tree, tree -> root);
-    printf("\n");
-    avl_insert(tree, 25);
+
+    for (i = 0; i < NUM_THREADS; i++) {
+        args[i].data = nums[i];
+        args[i].tree = tree;
+    }
+    for (i = 0; i < NUM_THREADS; i++) 
+        /* Print error message and return failure if thread fails to create */
+        if (pthread_create(&(threads[i]), NULL, parell_insert, (void *) &(args[i]))) {
+            fprintf(stderr, "Error: failed to create thread %d", i+1);
+            avl_delete(tree);
+            return 1;
+        }
+
+    /* Wait for threads to finish */
+    for (i = 0; i < NUM_THREADS; i++) 
+        pthread_join(threads[i], NULL);
+    /* Print the tree and the root */
     avl_display(tree, tree -> root);
     printf("\nroot = %d\ntree size = %d\n", tree -> root -> key, tree -> size);
     avl_delete(tree);
