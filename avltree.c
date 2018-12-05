@@ -5,22 +5,18 @@
 /* Returns the maximum between two values */
 #define MAX(a, b) a > b ? a : b
 
-/* Helper function, used to restore height balance property */
-static void restore_balance(AVL *, Node *);
 /* Helper function, performs a left-left rotation */
-Node *rightRotate(Node *y);
+Node *right_rotate(Node *y);
 /* Helper function, performs a right-right test */
-Node *leftRotate(Node *x);
+Node *left_rotate(Node *x);
 /* Helper function, used to help with insertions */
 Node *avl_insert_node(AVL *, Node *, int);
 /* Helper function, used to get height balance */
 static int get_Balance(Node *);
 /* Helper function, return height of node */
 static int height(Node *);
-/* Helper function, right-right rotation */
-Node *leftRotate(Node *);
-/* Helper function, left-left rotation */
-Node *rightRotate(Node *);
+/* Helper function, deletes nodes in the tree */
+static void delete_nodes(Node *);
 
 /* Node in tree */
 struct node {
@@ -62,7 +58,7 @@ Node *newNode(int key) {
     node -> key = key;
     node -> left = NULL;
     node -> right = NULL;
-    node -> height = 1; // new node is initially added at leaf
+    node -> height = 1;
     
     return node;
 }
@@ -79,6 +75,8 @@ int avl_insert(AVL *tree, int data) {
 }
 
 Node *avl_insert_node(AVL *tree, Node *node, int key) {
+
+    int balance;
 
     /* Perform the normal BST insertion */
     if (!node) {
@@ -99,28 +97,29 @@ Node *avl_insert_node(AVL *tree, Node *node, int key) {
      * Get the balance factor of this ancestor node to check 
      * whether this node became unbalanced 
      */
-    int balance = get_Balance(node);
+    balance = get_Balance(node);
 
     /*Left Left Case */
-    if (balance > 1 && key < node->left->key)
-        return rightRotate(node);
+    if (balance > 1 && key < node -> left -> key)
+        return right_rotate(node);
     /* Right Right Case */
-    if (balance < -1 && key > node->right->key)
-        return leftRotate(node);
+    if (balance < -1 && key > node -> right -> key)
+        return left_rotate(node);
     /* Left Right Case */
     if (balance > 1 && key > node -> left -> key) {
-        node -> left = leftRotate(node -> left);
-        return rightRotate(node);
+        node -> left = left_rotate(node -> left);
+        return right_rotate(node);
     }
     /* Right Left Case */
     if (balance < -1 && key < node->right->key) {
-        node -> right = rightRotate(node -> right);
-        return leftRotate(node);
+        node -> right = right_rotate(node -> right);
+        return left_rotate(node);
     }
-    /* return the (unchanged) node pointer */
+
     return node;
 }
 
+/* Return the height balance of the node */
 static int get_Balance(Node *n) {
     if (!n) return 0;
     return height(n -> left) - height(n -> right);
@@ -129,7 +128,7 @@ static int get_Balance(Node *n) {
 static int height(Node *n) { return n ? n -> height : 0; }
 
 /* A utility function to right rotate subtree rooted with y */
-Node *rightRotate(Node *y) {
+Node *right_rotate(Node *y) {
     
     Node *x, *T2;
     
@@ -149,7 +148,7 @@ Node *rightRotate(Node *y) {
 }
 
 /* A utility function to left rotate subtree rooted with x */
-Node *leftRotate(Node *x) {
+Node *left_rotate(Node *x) {
     
     Node *y, *T2;
     
@@ -168,12 +167,29 @@ Node *leftRotate(Node *x) {
     return y;
 }
 
+/* Print the contents of the avl tree using the preorder traversal */
 void avl_display(AVL *tree, Node *node) {
     if (node) {
         printf("%d ", node -> key);
         avl_display(tree, node -> left);
         avl_display(tree, node -> right);
     }
+}
+
+/* Delete an avl tree object */
+void avl_delete(AVL *avl) {
+    delete_nodes(avl -> root);
+    free((void *) avl);
+}
+
+static void delete_nodes(Node *node) {
+
+    if (node) {
+        delete_nodes(node -> right);
+        delete_nodes(node -> left);
+        free((void *) node);
+    }
+
 }
 
 int main(int argc, char **argv) {
@@ -199,6 +215,7 @@ int main(int argc, char **argv) {
     avl_insert(tree, 25);
     avl_display(tree, tree -> root);
     printf("\nroot = %d\ntree size = %d\n", tree -> root -> key, tree -> size);
+    avl_delete(tree);
 
     return 0;
 }

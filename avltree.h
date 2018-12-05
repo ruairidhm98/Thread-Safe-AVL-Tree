@@ -14,5 +14,7 @@ Node *avl_get(AVL *, Node *, char *);
 int avl_insert(AVL *, int);
 /* Prints contents of avl tree */
 void avl_display(AVL *, Node *);
+/* Delete an avl tree object */
+void avl_delete(AVL *);
 
 #endif
